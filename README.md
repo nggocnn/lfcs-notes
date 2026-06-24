@@ -7,5 +7,3 @@ These notes cover the LFCS exam domains in order:
 3. [Users and Groups](./03-users-and-groups.md)
 4. [Networking](./04-networking.md)
 5. [Storage](./05-storage.md)
-
-The examples are written as practical command-line snippets with short sample output where useful.
