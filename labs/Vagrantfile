@@ -1,0 +1,70 @@
+# LFCS practice lab: base (jump host) + node01 + node02 (Ubuntu 22.04) + rocky (Rocky 9, SELinux).
+# Usage: see labs/00-environment.md. Extra disks need: export VAGRANT_EXPERIMENTAL="disks"
+
+UBUNTU = "bento/ubuntu-22.04"
+ROCKY  = "bento/rockylinux-9"
+
+NODES = {
+  "base"   => { box: UBUNTU, ip: "192.168.56.10", mem: 512,  cpus: 1, disks: 0, bond_nics: false, nested: false },
+  "node01" => { box: UBUNTU, ip: "192.168.56.11", mem: 2048, cpus: 2, disks: 3, bond_nics: false, nested: true  },
+  "node02" => { box: UBUNTU, ip: "192.168.56.12", mem: 1024, cpus: 1, disks: 2, bond_nics: true,  nested: false },
+  "rocky"  => { box: ROCKY,  ip: "192.168.56.13", mem: 1536, cpus: 1, disks: 1, bond_nics: false, nested: false },
+}
+
+PROVISION = <<~'SHELL'
+  set -e
+  # hosts file so every VM can reach the others by name
+  sed -i '/lfcs-lab/d' /etc/hosts
+  cat >> /etc/hosts <<'EOT'
+  192.168.56.10 base   # lfcs-lab
+  192.168.56.11 node01 # lfcs-lab
+  192.168.56.12 node02 # lfcs-lab
+  192.168.56.13 rocky  # lfcs-lab
+  EOT
+  # one shared lab key: the first VM to boot creates it in the synced folder
+  install -d -m 700 /vagrant/.lab
+  [ -f /vagrant/.lab/id_ed25519 ] || ssh-keygen -q -t ed25519 -N '' -C lfcs-lab -f /vagrant/.lab/id_ed25519
+  install -d -m 700 -o vagrant -g vagrant /home/vagrant/.ssh
+  install -m 600 -o vagrant -g vagrant /vagrant/.lab/id_ed25519 /home/vagrant/.ssh/id_ed25519
+  install -m 644 -o vagrant -g vagrant /vagrant/.lab/id_ed25519.pub /home/vagrant/.ssh/id_ed25519.pub
+  grep -qf /vagrant/.lab/id_ed25519.pub /home/vagrant/.ssh/authorized_keys || cat /vagrant/.lab/id_ed25519.pub >> /home/vagrant/.ssh/authorized_keys
+  cat > /home/vagrant/.ssh/config <<'EOT'
+  Host base node01 node02 rocky
+      StrictHostKeyChecking accept-new
+  EOT
+  chown vagrant:vagrant /home/vagrant/.ssh/config; chmod 600 /home/vagrant/.ssh/config
+  # tools the exam hosts have (vim, git, man pages)
+  if command -v apt-get >/dev/null; then
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -qq
+    apt-get install -y -qq vim git man-db bash-completion acl lvm2 xfsprogs nfs-common sysstat >/dev/null
+  else
+    dnf install -y -q vim git man-pages bash-completion acl lvm2 policycoreutils-python-utils setroubleshoot-server >/dev/null
+  fi
+SHELL
+
+Vagrant.configure("2") do |config|
+  NODES.each do |name, o|
+    config.vm.define name do |n|
+      n.vm.box = o[:box]
+      n.vm.hostname = name
+      n.vm.synced_folder "..", "/lfcs"   # whole repo: notes, labs, mock scripts
+      n.vm.network "private_network", ip: o[:ip]
+      if o[:bond_nics]
+        # two spare NICs on an internal network for bond/bridge labs (left unconfigured)
+        n.vm.network "private_network", ip: "10.99.0.2", virtualbox__intnet: "lfcs-bond", auto_config: false
+        n.vm.network "private_network", ip: "10.99.0.3", virtualbox__intnet: "lfcs-bond", auto_config: false
+      end
+      (1..o[:disks]).each do |i|
+        n.vm.disk :disk, name: "#{name}-extra#{i}", size: "2GB"
+      end
+      n.vm.provider "virtualbox" do |vb|
+        vb.name = "lfcs-#{name}"
+        vb.memory = o[:mem]
+        vb.cpus = o[:cpus]
+        vb.customize ["modifyvm", :id, "--nested-hw-virt", "on"] if o[:nested]
+      end
+      n.vm.provision "shell", inline: PROVISION
+    end
+  end
+end
