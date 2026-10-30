@@ -1,6 +1,6 @@
 # Operations Deployment
 
-This section covers boot and shutdown procedures, scripting, service management, logs, scheduled tasks, package management, process/resource monitoring, kernel runtime parameters, and SELinux basics.
+This section covers boot and shutdown procedures, scripting, service management, logs, scheduled tasks, package management, process/resource monitoring, kernel runtime parameters, SELinux, recovery from boot and filesystem failures, containers, libvirt virtual machines, and kernel modules.
 
 ## 1. Safe boot, reboot, and shutdown
 
@@ -406,7 +406,7 @@ $ sudo chcon -t httpd_sys_content_t /var/index.html
 $ sudo restorecon -R /var/log/
 ```
 
-## 14. Cron syntax in depth
+## 13. Cron syntax in depth
 
 The existing note shows a simple crontab entry. The full syntax has five time fields plus, in the system-wide table, a username field.
 
@@ -418,20 +418,20 @@ The existing note shows a simple crontab entry. The full syntax has five time fi
 
 Field ranges:
 
-| Field | Range |
-|-------|-------|
-| minute | 0–59 |
-| hour | 0–23 |
-| day of month | 1–31 |
-| month | 1–12 or jan–dec |
-| day of week | 0–6 (0=Sun) or 7=Sun; also sun–sat |
+| Field        | Range                              |
+| ------------ | ---------------------------------- |
+| minute       | 0–59                               |
+| hour         | 0–23                               |
+| day of month | 1–31                               |
+| month        | 1–12 or jan–dec                    |
+| day of week  | 0–6 (0=Sun) or 7=Sun; also sun–sat |
 
 Special characters:
 
-- `*` — every value in the field
-- `,` — list of values, e.g. `15,45` in the minute field
-- `-` — range, e.g. `2-4` in the hour field runs at 02:00, 03:00, 04:00
-- `/` — step, e.g. `*/4` in the hour field runs every four hours; `0-8/4` runs at 0, 4, 8
+- `*` - every value in the field
+- `,` - list of values, e.g. `15,45` in the minute field
+- `-` - range, e.g. `2-4` in the hour field runs at 02:00, 03:00, 04:00
+- `/` - step, e.g. `*/4` in the hour field runs every four hours; `0-8/4` runs at 0, 4, 8
 
 Practical examples from the lecture:
 
@@ -480,7 +480,7 @@ $ sudo rm /etc/cron.hourly/myscript
 
 The four directories are `/etc/cron.daily/`, `/etc/cron.hourly/`, `/etc/cron.weekly/`, and `/etc/cron.monthly/`. Scripts placed there must be readable and executable and must have no file extension or cron will skip them.
 
-## 15. `at` command in depth
+## 14. `at` command in depth
 
 `at` schedules a command to run once. After typing the time specification, `at` opens an interactive prompt where you enter commands one per line. Press Ctrl-D to save.
 
@@ -517,7 +517,7 @@ DBUS_SESSION_BUS_ADDRESS=...; export DBUS_SESSION_BUS_ADDRESS
 $ atrm 1         # remove job 1
 ```
 
-## 16. Hardware inspection: `df -h`, `lspci`, and load averages
+## 15. Hardware inspection: `df -h`, `lspci`, and load averages
 
 ### Human-readable disk usage
 
@@ -555,10 +555,10 @@ $ uptime
 
 A value of 1.0 means one core was at 100% for that period. On an 8-core machine:
 
-- `6.00 0.31 0.18` — a recent spike that has already subsided; not alarming
-- `6.12 7.12 7.30` — sustained high load for 15 minutes; time to investigate
+- `6.00 0.31 0.18` - a recent spike that has already subsided; not alarming
+- `6.12 7.12 7.30` - sustained high load for 15 minutes; time to investigate
 
-## 17. `fsck.ext4` for ext4 filesystem checks
+## 16. `fsck.ext4` for ext4 filesystem checks
 
 The existing note covers `xfs_repair` for XFS. Ubuntu defaults to ext4, which uses `fsck.ext4`. The filesystem must be unmounted before running either tool.
 
@@ -572,9 +572,9 @@ $ sudo fsck.ext4 -v -f -p /dev/vdb2
 
 Flags:
 
-- `-v` — verbose output showing inode and block counts
-- `-f` — force a full check even if the filesystem reports itself clean
-- `-p` — "preen" mode: fix simple errors automatically without prompting; serious errors still pause for confirmation
+- `-v` - verbose output showing inode and block counts
+- `-f` - force a full check even if the filesystem reports itself clean
+- `-p` - "preen" mode: fix simple errors automatically without prompting; serious errors still pause for confirmation
 
 The most important flag to remember is `-p`. Without it, a filesystem with many minor errors will ask yes/no for every one of them.
 
@@ -582,7 +582,7 @@ The most important flag to remember is `-p`. Without it, a filesystem with many 
 $ sudo fsck.ext4 -p /dev/vdb2
 ```
 
-## 18. `systemctl list-dependencies`
+## 17. `systemctl list-dependencies`
 
 `systemctl list-dependencies` prints a tree of units that the default target depends on, showing at a glance which services are active (filled circle) and which are inactive (empty circle).
 
@@ -598,7 +598,7 @@ default.target
     └─dbus.service
 ```
 
-An empty circle next to a service that should always run — like `atd.service` or `cron.service` — signals a problem. Diagnose it:
+An empty circle next to a service that should always run - like `atd.service` or `cron.service` - signals a problem. Diagnose it:
 
 ```bash
 $ systemctl status atd.service
@@ -611,7 +611,7 @@ $ sudo systemctl start atd.service
 $ journalctl -u atd.service    # deeper log inspection if start fails
 ```
 
-## 19. `sysctl -a` and parameter namespaces
+## 18. `sysctl -a` and parameter namespaces
 
 The existing note shows how to read and write individual parameters. The lecture adds the technique of listing all parameters and filtering by namespace.
 
@@ -626,9 +626,9 @@ vm.swappiness = 60
 
 Parameter names follow a dotted-namespace convention:
 
-- `net.*` — network subsystem settings
-- `vm.*` — virtual memory / swap behavior
-- `fs.*` — filesystem-level kernel settings
+- `net.*` - network subsystem settings
+- `vm.*` - virtual memory / swap behavior
+- `fs.*` - filesystem-level kernel settings
 
 Filter to a namespace with grep:
 
@@ -650,7 +650,7 @@ vm.swappiness = 20
 
 The `-p` flag applies a conf file immediately without rebooting. `/etc/sysctl.conf` also works but can be overwritten on OS upgrades, so prefer `/etc/sysctl.d/` for custom changes.
 
-## 20. SELinux context anatomy
+## 19. SELinux context anatomy
 
 The existing note covers labels and mode commands at a surface level. The lecture goes deeper into what the four parts of a context label mean.
 
@@ -661,12 +661,12 @@ $ ls -Z archive.tar.gz
 unconfined_u:object_r:user_home_t:s0 archive.tar.gz
 ```
 
-| Part | Example | Meaning |
-|------|---------|---------|
-| user | `unconfined_u` | SELinux user identity (mapped from the Linux login) |
-| role | `object_r` | what roles this user/process can enter |
-| type | `user_home_t` | the security domain — most important part |
-| level | `s0` | MLS/MCS sensitivity level (usually `s0` on standard systems) |
+| Part  | Example        | Meaning                                                      |
+| ----- | -------------- | ------------------------------------------------------------ |
+| user  | `unconfined_u` | SELinux user identity (mapped from the Linux login)          |
+| role  | `object_r`     | what roles this user/process can enter                       |
+| type  | `user_home_t`  | the security domain - most important part                    |
+| level | `s0`           | MLS/MCS sensitivity level (usually `s0` on standard systems) |
 
 The type is the enforcement boundary. A file's type controls which processes may read or execute it; a process's domain (also called type) controls what it may do. Only files labeled with `sshd_exec_t` can launch a process that enters the `sshd_t` domain:
 
@@ -701,7 +701,7 @@ user_u         user             s0             user_r
 
 `semanage login -l` shows how Linux login names map to SELinux users. `semanage user -l` shows which roles each SELinux user is allowed to assume. On most default installations everything maps to `unconfined_u`, meaning SELinux restricts only specific confined services (like `httpd` or `sshd`) rather than user sessions.
 
-## 21. Docker containers
+## 20. Docker containers
 
 Docker is a container runtime that packages an application together with its configuration files, logs, and runtime libraries into a single portable unit. Moving a containerized application to another host is as simple as copying the container image.
 
@@ -722,7 +722,374 @@ nginx            latest  021283c8eb95   3 weeks ago    187MB
 
 `docker images` lists the container images cached locally. Each image is identified by a repository name, a tag (defaulting to `latest`), and a unique image ID.
 
-## 22. What to practice for LFCS
+## 21. Recovering from boot and filesystem failures
+
+The curriculum asks you to "recover from hardware, operating system, or filesystem failures". In practice that means four things: getting a shell when boot fails, fixing a bad `/etc/fstab`, resetting a lost root password, and repairing a filesystem or the bootloader.
+
+### Booting into rescue or emergency mode
+
+1. Show the GRUB menu: hold `Shift` (BIOS) or tap `Esc` (UEFI) during boot.
+2. Highlight the entry and press `e`.
+3. At the end of the line starting with `linux`, add one of:
+   - `systemd.unit=rescue.target`: single-user mode with local filesystems mounted
+   - `systemd.unit=emergency.target`: minimal shell, root mounted read-only, nothing else
+   - `init=/bin/bash`: no systemd at all, for when the others fail
+4. Press `Ctrl+X` to boot.
+
+The same targets are available from a running system:
+
+```bash
+$ sudo systemctl isolate rescue.target
+$ sudo systemctl set-default multi-user.target   # persistent default
+$ sudo systemctl get-default
+```
+
+Rescue and emergency mode ask for the root password. On Ubuntu, root has no password by default, so you get `Cannot open access to console, the root account is locked`. In that case use `init=/bin/bash`.
+
+### Fixing a broken /etc/fstab
+
+A typo in `/etc/fstab`, or a disk that has disappeared, stops the boot in emergency mode with a message like `Dependency failed for /data` or `Timed out waiting for device`.
+
+```bash
+# mount root read-write so you can edit
+# mount -o remount,rw /
+# vi /etc/fstab               # fix or comment out the bad line
+# systemctl daemon-reload
+# mount -a                    # must finish with no errors
+# reboot
+```
+
+Always test new fstab lines with `sudo mount -a` and `findmnt --verify` before rebooting. Add `nofail` to non-critical mounts so that a missing disk doesn't block the boot.
+
+### Resetting a lost root password
+
+On Ubuntu/Debian, boot with `init=/bin/bash`:
+
+```bash
+# mount -o remount,rw /
+# passwd root
+# sync
+# exec /sbin/init             # or: reboot -f
+```
+
+On RHEL/Rocky, add `rd.break` to the `linux` line instead:
+
+```bash
+# mount -o remount,rw /sysroot
+# chroot /sysroot
+# passwd root
+# touch /.autorelabel         # SELinux must relabel the changed /etc/shadow
+# exit ; exit
+```
+
+### Repairing a filesystem
+
+The filesystem must not be mounted, or you can corrupt it:
+
+```bash
+$ sudo umount /dev/vdb1
+$ sudo fsck.ext4 -f /dev/vdb1          # -y answers yes to every fix
+$ sudo xfs_repair /dev/vdc1            # XFS; use -L only as a last resort (drops the log)
+```
+
+For the root filesystem, check it at the next boot by adding `fsck.mode=force` to the kernel line, or run the check from rescue media.
+
+### Reinstalling or regenerating GRUB
+
+```bash
+# Ubuntu/Debian
+$ sudo grub-install /dev/sda
+$ sudo update-grub
+
+# RHEL/Rocky (BIOS)
+$ sudo grub2-install /dev/sda
+$ sudo grub2-mkconfig -o /boot/grub2/grub.cfg
+```
+
+### Hardware failures
+
+Check for disk errors in `dmesg -T | grep -i error`, `journalctl -k -p err` and `smartctl -a /dev/sda` (package `smartmontools`). See [99-extensions.md](./99-extensions.md) for replacing a failed software RAID member.
+
+## 22. Package repositories and maintenance
+
+The competency is to search for, install, validate and maintain software packages and repositories.
+
+### Debian/Ubuntu (apt, dpkg)
+
+```bash
+$ apt show nginx                       # details, dependencies
+$ apt-cache policy nginx               # installed vs candidate version, and which repo
+$ apt list --installed | grep nginx
+$ apt list --upgradable
+$ sudo apt install nginx=1.18.0-6ubuntu14   # a specific version
+$ sudo apt-mark hold nginx             # keep it out of upgrades
+$ apt-mark showhold
+$ sudo apt-mark unhold nginx
+$ sudo apt remove nginx                # keeps config files
+$ sudo apt purge nginx                 # removes config files too
+$ sudo apt autoremove                  # unused dependencies
+$ sudo apt-get install --reinstall coreutils
+$ apt-file search bin/semanage         # which package ships a file (install apt-file, then apt-file update)
+```
+
+Validate installed packages:
+
+```bash
+$ dpkg -V nginx                        # files changed since install; no output = clean
+$ sudo dpkg --audit                    # half-installed packages
+$ sudo dpkg --configure -a             # finish interrupted installs
+$ sudo apt --fix-broken install        # resolve broken dependencies
+```
+
+Add a third-party repository. The modern way stores the key in `/etc/apt/keyrings` and references it with `signed-by`:
+
+```bash
+$ sudo install -d -m 0755 /etc/apt/keyrings
+$ curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+$ echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu jammy stable" \
+    | sudo tee /etc/apt/sources.list.d/docker.list
+$ sudo apt update
+```
+
+A PPA is a one-liner: `sudo add-apt-repository ppa:<user>/<ppa>`. To remove a repository, delete its file from `/etc/apt/sources.list.d/` and run `apt update`. Ubuntu 24.04 writes the main repositories in deb822 format to `/etc/apt/sources.list.d/ubuntu.sources`; 22.04 uses `/etc/apt/sources.list`.
+
+### RHEL/Rocky (dnf, rpm)
+
+| Task                       | apt / dpkg                  | dnf / rpm                           |
+| -------------------------- | --------------------------- | ----------------------------------- |
+| search                     | `apt search x`              | `dnf search x`                      |
+| info                       | `apt show x`                | `dnf info x`                        |
+| install / remove           | `apt install/remove x`      | `dnf install/remove x`              |
+| upgrade all                | `apt update && apt upgrade` | `dnf upgrade`                       |
+| which package owns a file  | `dpkg -S /path`             | `rpm -qf /path`                     |
+| files in a package         | `dpkg -L x`                 | `rpm -ql x`                         |
+| package for a missing file | `apt-file search`           | `dnf provides '*/semanage'`         |
+| verify                     | `dpkg -V x`                 | `rpm -V x`                          |
+| list repos                 | `apt-cache policy`          | `dnf repolist --all`                |
+| hold a version             | `apt-mark hold x`           | `dnf versionlock add x` (plugin)    |
+| history and rollback       | `/var/log/apt/history.log`  | `dnf history`, `dnf history undo N` |
+
+Add a dnf repository with a file in `/etc/yum.repos.d/`:
+
+```ini
+# /etc/yum.repos.d/local.repo
+[local]
+name=Local repo
+baseurl=http://repo.example.com/rocky9/
+enabled=1
+gpgcheck=0
+```
+
+or with `sudo dnf config-manager --add-repo <url>` (package `dnf-plugins-core`). Enable or disable a repository with `dnf config-manager --set-enabled|--set-disabled <id>`.
+
+## 23. Enforcing MAC with SELinux
+
+Section 12 covers inspecting contexts. The curriculum says "create and enforce", so you also need persistent modes, persistent file labels, booleans, ports, and reading denials. The tools are in `policycoreutils-python-utils` on Rocky.
+
+Modes:
+
+```bash
+$ sestatus
+$ sudo setenforce 1                    # runtime only: 1 = enforcing, 0 = permissive
+$ sudo vi /etc/selinux/config          # persistent: SELINUX=enforcing
+```
+
+Going from `disabled` to `enforcing` needs a full relabel and a reboot: `sudo touch /.autorelabel && sudo reboot`.
+
+Persistent file labels. `chcon` doesn't survive a relabel, but `semanage fcontext` does:
+
+```bash
+$ sudo semanage fcontext -a -t httpd_sys_content_t "/srv/web(/.*)?"
+$ sudo restorecon -Rv /srv/web
+$ ls -Zd /srv/web
+$ sudo semanage fcontext -l | grep /srv/web
+$ matchpathcon /srv/web/index.html     # what the label should be
+```
+
+Booleans switch optional behaviour in the policy:
+
+```bash
+$ getsebool -a | grep httpd
+$ sudo setsebool -P httpd_can_network_connect on   # -P = persistent
+$ sudo semanage boolean -l | grep httpd_can_network_connect
+```
+
+Ports: a service may only bind ports labelled for it:
+
+```bash
+$ sudo semanage port -l | grep http_port_t
+$ sudo semanage port -a -t http_port_t -p tcp 8081
+$ sudo semanage port -m -t http_port_t -p tcp 8081  # use -m if the port already has another type
+```
+
+Troubleshooting denials:
+
+```bash
+$ sudo ausearch -m AVC -ts recent
+$ sudo ausearch -m AVC -ts recent | audit2why
+$ sudo journalctl -t setroubleshoot    # if setroubleshoot-server is installed
+$ sudo semanage permissive -a httpd_t  # make one domain permissive while debugging
+$ sudo semanage permissive -d httpd_t
+```
+
+Typical exam flow: a web server serves a 403, or can't bind a port while SELinux is enforcing. Fix the label or the port. Don't set the system to permissive.
+
+SELinux on Ubuntu is possible but not the default, because Ubuntu uses AppArmor. To enable it: `sudo apt install selinux-basics selinux-policy-default auditd`, disable AppArmor, run `sudo selinux-activate`, then reboot twice. Expect a RHEL-family host for SELinux tasks.
+
+## 24. Containers with Docker and Podman
+
+The competency is "configure container engines, create and manage containers". Docker and Podman share almost the same CLI. Podman needs no daemon and can run rootless.
+
+Run and manage containers:
+
+```bash
+$ sudo docker pull nginx:1.25
+$ sudo docker run -d --name web -p 8080:80 \
+    -v /srv/www:/usr/share/nginx/html:ro \
+    --restart unless-stopped nginx:1.25
+$ sudo docker ps                        # -a includes stopped containers
+$ sudo docker logs -f web
+$ sudo docker exec -it web sh
+$ sudo docker inspect web --format '{{.State.Status}} {{.HostConfig.RestartPolicy.Name}}'
+$ sudo docker stop web ; sudo docker rm web
+$ sudo docker images ; sudo docker rmi nginx:1.25
+$ sudo docker run --rm -e MSG=hi alpine sh -c 'echo $MSG'
+```
+
+Restart policies are `no`, `on-failure`, `always` and `unless-stopped`. A container with `always` or `unless-stopped` comes back after a reboot only if the docker service is enabled (`systemctl is-enabled docker`).
+
+Volumes and networks:
+
+```bash
+$ sudo docker volume create dbdata
+$ sudo docker run -d --name db -v dbdata:/var/lib/mysql -e MARIADB_ROOT_PASSWORD=pw mariadb
+$ sudo docker network create appnet
+$ sudo docker run -d --name app --network appnet nginx
+```
+
+Build an image:
+
+```dockerfile
+# Dockerfile
+FROM nginx:1.25
+COPY index.html /usr/share/nginx/html/index.html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+```bash
+$ sudo docker build -t mysite:1.0 .
+$ sudo docker run -d -p 8081:80 mysite:1.0
+```
+
+Configure the engine:
+
+- Docker reads `/etc/docker/daemon.json`, for example `{"log-driver": "journald", "data-root": "/data/docker"}`. Run `sudo systemctl restart docker` after editing.
+- Podman reads `/etc/containers/registries.conf`, for example `unqualified-search-registries = ["docker.io"]`, so that short names like `nginx` resolve.
+
+Podman containers have no daemon to restart them, so persistence goes through systemd:
+
+```bash
+$ podman run -d --name web -p 8080:80 docker.io/library/nginx
+$ podman generate systemd --new --files --name web    # writes container-web.service
+$ mkdir -p ~/.config/systemd/user && mv container-web.service ~/.config/systemd/user/
+$ systemctl --user daemon-reload && systemctl --user enable --now container-web
+$ sudo loginctl enable-linger $USER                   # start user services at boot without a login
+```
+
+Podman 4.4+ prefers Quadlet files (`~/.config/containers/systemd/web.container`) over `generate systemd`, but both work.
+
+## 25. Virtual machines with libvirt
+
+The curriculum lists "Manage Virtual Machines (libvirt)". Expect to list, start, stop, autostart, resize and create VMs with `virsh` and `virt-install`.
+
+Install on Ubuntu:
+
+```bash
+$ sudo apt install qemu-kvm libvirt-daemon-system libvirt-clients virtinst
+$ sudo usermod -aG libvirt $USER       # log out and back in
+$ virsh -c qemu:///system list --all
+```
+
+As a normal user `virsh` connects to `qemu:///session` by default. Use `sudo` or `-c qemu:///system` to see the system VMs.
+
+Lifecycle:
+
+```bash
+$ sudo virsh list --all
+$ sudo virsh start vm1
+$ sudo virsh shutdown vm1              # graceful (ACPI)
+$ sudo virsh destroy vm1               # hard power off, not delete
+$ sudo virsh reboot vm1
+$ sudo virsh autostart vm1             # start with the host; --disable to undo
+$ sudo virsh dominfo vm1               # state, vCPUs, memory, autostart
+$ sudo virsh console vm1               # Ctrl+] to leave
+```
+
+Change resources. `--config` changes the persistent definition, which takes effect at the next boot:
+
+```bash
+$ sudo virsh setvcpus vm1 2 --config --maximum
+$ sudo virsh setvcpus vm1 2 --config
+$ sudo virsh setmaxmem vm1 2G --config
+$ sudo virsh setmem vm1 2G --config
+$ sudo virsh edit vm1                  # edit the XML directly
+$ sudo virsh dumpxml vm1 > vm1.xml
+```
+
+Create and delete:
+
+```bash
+# import an existing disk image (fast, no installer)
+$ sudo virt-install --name vm2 --memory 1024 --vcpus 1 \
+    --disk /var/lib/libvirt/images/vm2.qcow2 --import \
+    --os-variant generic --network network=default --graphics none --noautoconsole
+
+$ sudo virsh define vm1.xml            # register a VM from XML
+$ sudo virsh undefine vm2 --remove-all-storage
+```
+
+`osinfo-query os` (package `libosinfo-bin`) lists the valid `--os-variant` values.
+
+Networks and storage:
+
+```bash
+$ sudo virsh net-list --all
+$ sudo virsh net-start default ; sudo virsh net-autostart default
+$ sudo virsh pool-list --all
+$ sudo virsh vol-list default
+```
+
+## 26. Kernel modules and boot parameters
+
+Kernel parameters are set in three places: `sysctl` (section 11), module options, and the kernel command line.
+
+Modules:
+
+```bash
+$ lsmod | grep br_netfilter
+$ modinfo br_netfilter
+$ sudo modprobe br_netfilter           # load now
+$ sudo modprobe -r br_netfilter        # unload
+$ echo br_netfilter | sudo tee /etc/modules-load.d/br_netfilter.conf    # load at boot
+$ echo "options loop max_loop=16" | sudo tee /etc/modprobe.d/loop.conf  # module option
+$ echo "blacklist pcspkr" | sudo tee /etc/modprobe.d/blacklist-pcspkr.conf
+$ cat /sys/module/loop/parameters/max_loop
+```
+
+Kernel command line:
+
+```bash
+$ cat /proc/cmdline
+# Ubuntu: edit GRUB_CMDLINE_LINUX_DEFAULT in /etc/default/grub, then
+$ sudo update-grub
+# RHEL/Rocky:
+$ sudo grubby --update-kernel=ALL --args="audit=1"
+```
+
+Check that a `sysctl` change is persistent without rebooting: `sudo sysctl --system` reloads every file in `/etc/sysctl.d/`, `/run/sysctl.d/` and `/usr/lib/sysctl.d/`, then `sysctl <key>` shows the value.
+
+## 27. What to practice for LFCS
 
 Prioritize these workflows:
 
@@ -739,3 +1106,9 @@ Prioritize these workflows:
 - understand the four-part SELinux context label (user:role:type:level)
 - use `id -Z`, `ls -Z`, `ps axZ`, `semanage login -l`, `semanage user -l` to inspect SELinux contexts
 - use `docker images` to list local container images; add user to the `docker` group to avoid sudo
+- recover from a broken fstab or a lost root password via the GRUB `e` menu
+- add, remove and validate apt/dnf repositories and packages (`apt-mark hold`, `dpkg -V`, `rpm -V`)
+- make SELinux changes persistent: `semanage fcontext` + `restorecon`, `setsebool -P`, `semanage port`
+- run containers with ports, volumes and restart policies; persist Podman containers with systemd
+- manage libvirt VMs with `virsh` (start, shutdown, autostart, setvcpus, setmem) and `virt-install --import`
+- load kernel modules at boot and set kernel command-line parameters

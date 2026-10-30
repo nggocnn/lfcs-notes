@@ -1,6 +1,6 @@
 # Networking
 
-This section covers IP addressing, interface inspection, service listening state, network configuration, bridging and bonding concepts, firewall rules, NAT and port forwarding, reverse proxies/load balancers, and time synchronization.
+This section covers IP addressing, interface inspection, service listening state, network configuration, bridging and bonding concepts, firewall rules, NAT and port forwarding, reverse proxies/load balancers, time synchronization, netplan and static routes, name resolution, iptables/nftables NAT, OpenSSH, chrony, and network troubleshooting.
 
 ## 1. IPv4, IPv6, and CIDR notation
 
@@ -279,7 +279,7 @@ Create a site config:
 $ sudo vim /etc/nginx/sites-available/proxy.conf
 ```
 
-Minimal reverse proxy config — forward all requests to an upstream server:
+Minimal reverse proxy config - forward all requests to an upstream server:
 
 ```nginx
 server {
@@ -309,8 +309,8 @@ Without these headers the upstream web server sees all requests as coming from t
 
 Nginx uses two directories:
 
-- `/etc/nginx/sites-available/` — holds all config files (active or not)
-- `/etc/nginx/sites-enabled/` — Nginx only reads files here
+- `/etc/nginx/sites-available/` - holds all config files (active or not)
+- `/etc/nginx/sites-enabled/` - Nginx only reads files here
 
 To activate the config, symlink it into `sites-enabled` and disable the default site:
 
@@ -365,9 +365,9 @@ server {
 }
 ```
 
-The `upstream` block defines a named group of servers. The `proxy_pass` then references that group name instead of a direct IP. With no extra directives, Nginx uses round-robin — requests alternate randomly between the listed servers.
+The `upstream` block defines a named group of servers. The `proxy_pass` then references that group name instead of a direct IP. With no extra directives, Nginx uses round-robin - requests alternate randomly between the listed servers.
 
-**`least_conn`** — send each request to the server with the fewest active connections:
+**`least_conn`** - send each request to the server with the fewest active connections:
 
 ```nginx
 upstream mywebservers {
@@ -377,7 +377,7 @@ upstream mywebservers {
 }
 ```
 
-**`weight`** — give more traffic to a more powerful server (default weight is 1):
+**`weight`** - give more traffic to a more powerful server (default weight is 1):
 
 ```nginx
 upstream mywebservers {
@@ -389,7 +389,7 @@ upstream mywebservers {
 
 With `weight=3` on the first server, roughly 3 of every 4 requests go to `1.2.3.4` and 1 goes to `5.6.7.8`.
 
-**`down`** — temporarily remove a server from rotation without deleting it (useful during maintenance):
+**`down`** - temporarily remove a server from rotation without deleting it (useful during maintenance):
 
 ```nginx
 upstream mywebservers {
@@ -399,7 +399,7 @@ upstream mywebservers {
 }
 ```
 
-**`backup`** — keep a server in reserve; it only receives traffic if all primary servers are unavailable:
+**`backup`** - keep a server in reserve; it only receives traffic if all primary servers are unavailable:
 
 ```nginx
 upstream mywebservers {
@@ -426,7 +426,7 @@ $ sudo systemctl reload nginx.service
 
 ## 13. NTP and systemd-timesyncd
 
-Hardware clocks in computers are not perfect — they slowly drift away from real time. To stay accurate, Linux systems periodically contact NTP (Network Time Protocol) servers on the internet to correct the drift.
+Hardware clocks in computers are not perfect - they slowly drift away from real time. To stay accurate, Linux systems periodically contact NTP (Network Time Protocol) servers on the internet to correct the drift.
 
 On Ubuntu, time synchronization is handled by `systemd-timesyncd`, which is part of the systemd suite.
 
@@ -440,7 +440,7 @@ America/New_York
 ...
 ```
 
-Set timezone — continent first, then city (use underscore for spaces):
+Set timezone - continent first, then city (use underscore for spaces):
 
 ```bash
 $ sudo timedatectl set-timezone America/New_York
@@ -496,10 +496,10 @@ NTP=0.us.pool.ntp.org 1.us.pool.ntp.org 2.us.pool.ntp.org 3.us.pool.ntp.org
 
 Key settings in `timesyncd.conf`:
 
-- `NTP` — primary servers to contact
-- `FallbackNTP` — used if the `NTP` line is empty or all servers fail
-- `RootDistanceMaxSec` — maximum allowed round-trip time to an NTP server before falling back
-- `PollIntervalMinSec` / `PollIntervalMaxSec` — how often to poll (timesyncd adapts between these bounds based on observed clock drift)
+- `NTP` - primary servers to contact
+- `FallbackNTP` - used if the `NTP` line is empty or all servers fail
+- `RootDistanceMaxSec` - maximum allowed round-trip time to an NTP server before falling back
+- `PollIntervalMinSec` / `PollIntervalMaxSec` - how often to poll (timesyncd adapts between these bounds based on observed clock drift)
 
 After editing, restart the daemon:
 
@@ -535,7 +535,385 @@ Root distance: 37.490ms (max: 5s)
     Frequency: -7.449ppm
 ```
 
-## 14. What to practice for LFCS
+## 14. Static IP, DNS and routes with netplan
+
+Section 5 gives the netplan workflow. This is the full syntax for the most common tasks. Files live in `/etc/netplan/*.yaml`. They are read in lexical order, and later files override earlier ones. Keep them at mode 600, otherwise netplan warns about permissions.
+
+```yaml
+# /etc/netplan/60-static.yaml
+network:
+  version: 2
+  ethernets:
+    enp0s8:
+      dhcp4: false
+      addresses:
+        - 192.168.56.11/24
+        - "fd00:56::11/64"
+      routes:
+        - to: default
+          via: 192.168.56.1
+        - to: 10.20.0.0/16
+          via: 192.168.56.254
+      nameservers:
+        addresses: [192.168.56.1, 1.1.1.1]
+        search: [lab.example]
+```
+
+```bash
+$ sudo chmod 600 /etc/netplan/60-static.yaml
+$ sudo netplan generate           # syntax check
+$ sudo netplan try                # applies, then rolls back after 120 s unless you press Enter
+$ sudo netplan apply
+$ ip -br addr ; ip route ; resolvectl status enp0s8
+```
+
+The old `gateway4:` key is deprecated. Use a route `to: default` instead.
+
+## 15. Static routing
+
+Runtime routes, which are lost at reboot:
+
+```bash
+$ sudo ip route add 10.20.0.0/16 via 192.168.56.254 dev enp0s8
+$ sudo ip route add default via 192.168.56.1
+$ sudo ip route del 10.20.0.0/16
+$ ip route get 10.20.1.5          # which route and interface a packet would use
+$ ip -6 route
+```
+
+To make a route persistent, use netplan `routes:` (section 14) on Ubuntu, or NetworkManager on RHEL/Rocky:
+
+```bash
+$ sudo nmcli connection modify eth1 +ipv4.routes "10.20.0.0/16 192.168.56.254"
+$ sudo nmcli connection up eth1
+```
+
+A host only routes traffic between interfaces when forwarding is on:
+
+```bash
+$ sudo sysctl -w net.ipv4.ip_forward=1
+$ echo "net.ipv4.ip_forward = 1" | sudo tee /etc/sysctl.d/90-forward.conf
+$ sudo sysctl --system
+```
+
+## 16. Hostname and name resolution
+
+```bash
+$ sudo hostnamectl set-hostname web01.lab.example
+$ hostnamectl
+$ echo "192.168.56.12  db01.lab.example db01" | sudo tee -a /etc/hosts
+$ getent hosts db01               # uses nsswitch, the same path applications use
+$ grep ^hosts /etc/nsswitch.conf
+hosts: files dns                  # /etc/hosts first, then DNS
+```
+
+On Ubuntu, `systemd-resolved` owns DNS. `/etc/resolv.conf` is a symlink to its stub at `127.0.0.53`, so don't edit it directly.
+
+```bash
+$ resolvectl status
+$ resolvectl query example.com
+$ sudo resolvectl dns enp0s8 1.1.1.1    # runtime only
+$ sudo resolvectl flush-caches
+$ dig +short example.com ; dig @1.1.1.1 example.com AAAA
+```
+
+For persistent DNS, set `nameservers:` in netplan, or set `DNS=` and `Domains=` in `/etc/systemd/resolved.conf` and run `sudo systemctl restart systemd-resolved`.
+
+## 17. Configuring bonds and bridges
+
+Section 6 explains the difference between the two. This section configures them.
+
+Bond in netplan. The members must be declared under `ethernets` with no addresses:
+
+```yaml
+network:
+  version: 2
+  ethernets:
+    enp0s9: { dhcp4: false }
+    enp0s10: { dhcp4: false }
+  bonds:
+    bond0:
+      interfaces: [enp0s9, enp0s10]
+      addresses: [10.0.0.11/24]
+      parameters:
+        mode: active-backup
+        primary: enp0s9
+        mii-monitor-interval: 100
+```
+
+```bash
+$ cat /proc/net/bonding/bond0     # mode, active member, link status
+$ ip -d link show bond0
+```
+
+Common modes are `active-backup` (failover, works with any switch), `balance-rr`, `802.3ad` (LACP, needs switch support) and `balance-alb`.
+
+Bridge in netplan. The IP goes on the bridge, not on the member:
+
+```yaml
+network:
+  version: 2
+  ethernets:
+    enp0s9: { dhcp4: false }
+  bridges:
+    br0:
+      interfaces: [enp0s9]
+      addresses: [10.0.0.21/24]
+      parameters:
+        stp: false
+        forward-delay: 0
+```
+
+```bash
+$ bridge link                     # members of each bridge
+$ ip -br link show master br0
+```
+
+The same with NetworkManager (RHEL/Rocky):
+
+```bash
+$ sudo nmcli con add type bond con-name bond0 ifname bond0 bond.options "mode=active-backup,miimon=100" \
+    ipv4.method manual ipv4.addresses 10.0.0.11/24
+$ sudo nmcli con add type ethernet con-name bond0-p1 ifname eth2 master bond0 slave-type bond
+$ sudo nmcli con add type ethernet con-name bond0-p2 ifname eth3 master bond0 slave-type bond
+$ sudo nmcli con add type bridge con-name br0 ifname br0 ipv4.method manual ipv4.addresses 10.0.0.21/24
+$ sudo nmcli con add type ethernet con-name br0-p1 ifname eth4 master br0 slave-type bridge
+$ sudo nmcli con up bond0 ; sudo nmcli con up br0
+```
+
+Runtime-only versions with `ip`, which are useful for quick tests:
+
+```bash
+$ sudo ip link add bond0 type bond mode active-backup
+$ sudo ip link set enp0s9 down ; sudo ip link set enp0s9 master bond0
+$ sudo ip link add br0 type bridge ; sudo ip link set enp0s10 master br0 ; sudo ip link set br0 up
+```
+
+## 18. Packet filtering, port redirection and NAT
+
+Section 8 explains the concept. These are the commands. On Ubuntu 22.04, `iptables` is a front end to nftables (`iptables -V` shows `nf_tables`), so both tools see the same kernel tables. Never block the exam's ports 8080, 4505 or 4506.
+
+### iptables
+
+Filtering:
+
+```bash
+$ sudo iptables -L -n -v --line-numbers
+$ sudo iptables -A INPUT -p tcp --dport 22 -j ACCEPT
+$ sudo iptables -A INPUT -s 10.0.0.50 -j DROP
+$ sudo iptables -I INPUT 1 -i lo -j ACCEPT        # insert at position 1
+$ sudo iptables -D INPUT 3                         # delete rule 3
+$ sudo iptables -A INPUT -p tcp --dport 3306 ! -s 10.0.0.0/24 -j REJECT
+```
+
+Port forwarding (DNAT) to another host, and masquerading (SNAT) for a private subnet:
+
+```bash
+$ sudo sysctl -w net.ipv4.ip_forward=1             # required, persist it (section 15)
+$ sudo iptables -t nat -A PREROUTING -i enp0s8 -p tcp --dport 8081 -j DNAT --to-destination 10.0.0.12:80
+$ sudo iptables -t nat -A POSTROUTING -s 10.0.0.0/24 -o enp0s3 -j MASQUERADE
+$ sudo iptables -t nat -L -n -v
+```
+
+Redirect a port on the same host. `REDIRECT` in PREROUTING only catches traffic from outside. Add an OUTPUT rule for local clients:
+
+```bash
+$ sudo iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-ports 8080
+$ sudo iptables -t nat -A OUTPUT -o lo -p tcp --dport 80 -j REDIRECT --to-ports 8080
+```
+
+Make rules persistent:
+
+```bash
+$ sudo apt install iptables-persistent       # offers to save the current rules
+$ sudo netfilter-persistent save             # writes /etc/iptables/rules.v4 and rules.v6
+```
+
+### nftables
+
+```bash
+$ sudo nft list ruleset
+$ sudo nft add table inet filter
+$ sudo nft add chain inet filter input '{ type filter hook input priority 0; policy accept; }'
+$ sudo nft add rule inet filter input tcp dport 23 drop
+$ sudo nft -a list chain inet filter input   # -a shows handles
+$ sudo nft delete rule inet filter input handle 5
+```
+
+For persistence, put the ruleset in `/etc/nftables.conf` and enable the service:
+
+```
+#!/usr/sbin/nft -f
+flush ruleset
+
+table inet filter {
+  chain input {
+    type filter hook input priority 0; policy accept;
+    tcp dport 23 drop
+  }
+}
+
+table ip nat {
+  chain prerouting {
+    type nat hook prerouting priority dstnat;
+    tcp dport 8081 dnat to 10.0.0.12:80
+  }
+  chain postrouting {
+    type nat hook postrouting priority srcnat;
+    ip saddr 10.0.0.0/24 oifname "enp0s3" masquerade
+  }
+}
+```
+
+```bash
+$ sudo nft -c -f /etc/nftables.conf          # check only
+$ sudo systemctl enable --now nftables
+```
+
+`flush ruleset` also wipes rules that Docker or UFW created. On a host that uses them, flush only your own tables.
+
+### UFW and firewalld
+
+UFW (section 7) has no direct port-forward command. Add NAT rules in a `*nat` block at the top of `/etc/ufw/before.rules`, set `DEFAULT_FORWARD_POLICY="ACCEPT"` in `/etc/default/ufw`, and allow forwarded traffic with `ufw route allow`.
+
+On RHEL/Rocky, firewalld is the default:
+
+```bash
+$ sudo firewall-cmd --permanent --add-service=http
+$ sudo firewall-cmd --permanent --add-port=8081/tcp
+$ sudo firewall-cmd --permanent --add-forward-port=port=8081:proto=tcp:toport=80:toaddr=10.0.0.12
+$ sudo firewall-cmd --permanent --add-masquerade
+$ sudo firewall-cmd --reload
+$ sudo firewall-cmd --list-all
+```
+
+## 19. Configuring the OpenSSH server and client
+
+### Server
+
+The config is `/etc/ssh/sshd_config`. Ubuntu 22.04 and later also read `/etc/ssh/sshd_config.d/*.conf` through an `Include` at the top of the file. For each keyword sshd uses the **first** value it reads, so a drop-in beats the main file, and a line in the main file beats a later line.
+
+```
+# /etc/ssh/sshd_config.d/50-hardening.conf
+Port 22
+PermitRootLogin no
+PasswordAuthentication no
+PubkeyAuthentication yes
+AllowUsers alice bob
+MaxAuthTries 3
+ClientAliveInterval 300
+```
+
+A `Match` block overrides the global settings for the connections it matches. It applies until the next `Match` line or the end of the configuration, and everything after an included drop-in is still part of the main file. So append `Match` blocks to the end of `/etc/ssh/sshd_config`, not to a drop-in:
+
+```
+# end of /etc/ssh/sshd_config
+Match Address 192.168.56.0/24
+    PasswordAuthentication yes
+```
+
+```bash
+$ sudo sshd -t                     # syntax check; no output = OK
+$ sudo sshd -T | grep -i passwordauthentication   # effective value
+$ sudo systemctl reload ssh        # the unit is ssh on Ubuntu, sshd on RHEL/Rocky
+```
+
+Port changes need extra steps:
+
+- open the new port in the firewall
+- on SELinux hosts, label it: `sudo semanage port -a -t ssh_port_t -p tcp 2222`
+- Ubuntu 24.04 starts sshd from `ssh.socket`, so after changing `Port` run `sudo systemctl daemon-reload && sudo systemctl restart ssh.socket`
+
+Keep a second session open while you test, so that a mistake doesn't lock you out. To regenerate the host keys, run `sudo ssh-keygen -A`.
+
+### Client
+
+```bash
+$ ssh-keygen -t ed25519 -C "alice@lab"          # creates ~/.ssh/id_ed25519 and .pub
+$ ssh-copy-id -i ~/.ssh/id_ed25519.pub alice@node02
+$ ssh -i ~/.ssh/id_ed25519 -p 2222 alice@node02
+$ ssh-keygen -R node02                           # forget a changed host key
+```
+
+Per-user client config in `~/.ssh/config` (mode 600):
+
+```
+Host db
+    HostName 192.168.56.12
+    User alice
+    Port 2222
+    IdentityFile ~/.ssh/id_ed25519
+```
+
+Then `ssh db` is enough. System-wide defaults go in `/etc/ssh/ssh_config` or `/etc/ssh/ssh_config.d/*.conf`.
+
+Permissions that break key login when wrong:
+
+- `~/.ssh` must be 700
+- `~/.ssh/authorized_keys` must be 600
+- the home directory must not be group- or world-writable
+
+The server log tells you which one is wrong: `journalctl -u ssh`.
+
+Other client features:
+
+```bash
+$ scp file.txt alice@node02:/tmp/
+$ rsync -avz -e ssh dir/ alice@node02:/backup/dir/
+$ ssh -L 8080:localhost:80 alice@node02          # local port forward
+$ ssh -J alice@jump alice@internal               # through a jump host
+```
+
+## 20. Time synchronization with chrony
+
+Section 13 covers `systemd-timesyncd`, which is the default client on Ubuntu. `chrony` is the default on RHEL/Rocky, and it can also serve time to other hosts. Installing `chrony` on Ubuntu replaces timesyncd.
+
+```bash
+$ sudo apt install chrony                         # RHEL: dnf install chrony
+```
+
+The config is `/etc/chrony/chrony.conf` on Ubuntu and `/etc/chrony.conf` on RHEL/Rocky:
+
+```
+server time.lab.example iburst
+pool 2.pool.ntp.org iburst
+# act as a server for the lab subnet:
+allow 192.168.56.0/24
+```
+
+```bash
+$ sudo systemctl restart chrony                   # chronyd on RHEL/Rocky
+$ chronyc sources -v                              # ^* marks the selected source
+$ chronyc tracking                                # current offset
+$ sudo chronyc makestep                           # jump the clock now instead of slewing
+$ timedatectl                                     # "System clock synchronized: yes"
+```
+
+To set the time by hand, NTP must be off: run `sudo timedatectl set-ntp false` then `sudo timedatectl set-time "2026-01-01 12:00:00"`. `sudo hwclock --systohc` copies the system time to the hardware clock.
+
+## 21. Monitoring and troubleshooting networking
+
+Work from the bottom layer up:
+
+```bash
+$ ip -br link                       # is the link UP?
+$ ip -s link show enp0s8            # error and drop counters
+$ ip -br addr                       # right address and prefix?
+$ ip route ; ip route get 8.8.8.8   # right gateway?
+$ ip neigh                          # ARP/neighbour table
+$ ping -c 3 192.168.56.1            # local network
+$ tracepath 8.8.8.8                 # or traceroute / mtr
+$ getent hosts example.com ; dig example.com   # DNS
+$ ss -tulpn                         # is the service listening, and on which address?
+$ nc -zv node02 80                  # can I reach the port?
+$ curl -I http://node02/            # does the application answer?
+$ sudo tcpdump -i enp0s8 -nn port 80 -c 20     # what is actually on the wire
+$ sudo iptables -L -n -v ; sudo nft list ruleset   # is a firewall dropping it?
+```
+
+`nmcli device status` and `networkctl status` show the state from NetworkManager and systemd-networkd respectively. Use whichever one manages the host.
+
+## 22. What to practice for LFCS
 
 You should be comfortable with:
 
@@ -555,3 +933,10 @@ You should be comfortable with:
 - installing and verifying `systemd-timesyncd`
 - customizing NTP servers in `/etc/systemd/timesyncd.conf`
 - checking sync details with `timedatectl show-timesync` and `timedatectl timesync-status`
+- write netplan YAML for static addresses, routes, DNS, bonds and bridges
+- add runtime and persistent static routes; enable IP forwarding
+- set the hostname and fix name resolution (`/etc/hosts`, `resolvectl`)
+- write filtering, DNAT, REDIRECT and MASQUERADE rules with iptables or nftables, and persist them
+- harden `sshd_config`, validate with `sshd -t`, set up key-based login and `~/.ssh/config`
+- configure chrony as a client or server and check it with `chronyc sources`
+- troubleshoot connectivity layer by layer

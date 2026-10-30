@@ -1,6 +1,6 @@
 # Storage
 
-This section covers swap, partitions, filesystems, mounting, mount options, `/etc/fstab`, NFS, remote block devices, LVM, RAID, ACLs, quotas, and storage monitoring.
+This section covers swap, partitions, filesystems, mounting, mount options, `/etc/fstab`, NFS, remote block devices, LVM, ACLs, storage monitoring, automounters, virtual filesystems, and network block devices. RAID and disk quotas are no longer in the curriculum and live in [99-extensions.md](./99-extensions.md).
 
 ## 1. Block devices and partitions
 
@@ -302,23 +302,7 @@ $ sudo mkfs.xfs /dev/volume1/smalldata
 $ sudo lvremove volume1/smalldata
 ```
 
-## 10. RAID with mdadm
-
-Linux can manage software RAID entirely without special hardware using `mdadm`.
-
-Example RAID 1 creation:
-
-```bash
-$ sudo mdadm --create /dev/md0 --level=1 --raid-devices=2 /dev/vdb /dev/vdc
-mdadm: array /dev/md0 started.
-```
-
-Why RAID matters:
-
-- RAID 1 mirrors data for redundancy
-- Linux can manage software RAID without special hardware
-
-## 11. Access Control Lists (ACLs)
+## 10. Access Control Lists (ACLs)
 
 ACLs extend normal owner/group/other permissions.
 
@@ -353,25 +337,7 @@ Recursive ACL update:
 $ sudo setfacl --recursive --modify user:john:rwx collection/
 ```
 
-## 12. Disk quotas
-
-The storage materials include quota management through `xfs_quota`.
-
-Example:
-
-```bash
-$ sudo xfs_quota -x -c 'limit bsoft=100m bhard=500m john' /dev/vda1
-```
-
-Meaning:
-
-- `bsoft=100m` soft block limit
-- `bhard=500m` hard block limit
-- applies to user `john`
-
-Quotas matter when multiple users share the same filesystem and one user must not consume all space.
-
-## 13. Monitoring storage performance
+## 11. Monitoring storage performance
 
 `iostat` and `pidstat` from the `sysstat` package are the main tools for storage performance monitoring.
 
@@ -401,7 +367,7 @@ This helps answer two different questions:
 - which device is busy?
 - which process is causing the load?
 
-## 14. Swap in /etc/fstab
+## 12. Swap in /etc/fstab
 
 A swap partition needs its own fstab entry to be activated automatically at boot. The format differs slightly from a normal mount: the mount-point field is `none` (swap is not mounted into any directory) and the filesystem type is `swap`. Both the dump and fsck fields are `0` because swap does not need to be backed up or checked for errors.
 
@@ -417,7 +383,7 @@ NAME      TYPE      SIZE USED PRIO
 /dev/vdb3 partition   2G   0B   -2
 ```
 
-## 15. UUID-based device names in fstab
+## 13. UUID-based device names in fstab
 
 Device names like `/dev/vda` or `/dev/sda` are assigned in the order Linux sees storage devices at boot. Swapping cable order on a real server can change which device gets which name, causing the wrong thing to be mounted. UUIDs are burned into the filesystem and never change regardless of cable order.
 
@@ -443,13 +409,13 @@ Use the UUID as the first field in fstab instead of the device path:
 UUID=9ab8cfa5-2813-4b70-ada0-7abd0ad9d289 /mybackups xfs defaults 0 2
 ```
 
-Or use the longer `/dev/disk/by-uuid/` path form — both work identically:
+Or use the longer `/dev/disk/by-uuid/` path form - both work identically:
 
 ```text
 /dev/disk/by-uuid/9ab8cfa5-2813-4b70-ada0-7abd0ad9d289 /mybackups xfs defaults 0 2
 ```
 
-## 16. Filtering mounted filesystems with findmnt -t
+## 14. Filtering mounted filesystems with findmnt -t
 
 `findmnt` with no arguments prints everything including virtual pseudo-filesystems (`proc`, `tmpfs`, `devtmpfs`), which makes the output hard to scan. The `-t` flag limits output to specific filesystem types:
 
@@ -461,14 +427,14 @@ TARGET      SOURCE                              FSTYPE OPTIONS
 └─/mybackups /dev/vdb1                          xfs    rw,relatime,seclabel,attr2,inode64
 ```
 
-Only currently-mounted filesystems appear — partitions that exist but are not yet mounted are invisible to `findmnt`.
+Only currently-mounted filesystems appear - partitions that exist but are not yet mounted are invisible to `findmnt`.
 
-## 17. Filesystem-specific mount options
+## 15. Filesystem-specific mount options
 
 Mount options fall into two categories:
 
-- **Filesystem-independent** — documented in `man mount`; work on almost any filesystem (`ro`, `rw`, `noexec`, `nosuid`, `remount`, `async`, `atime`, etc.)
-- **Filesystem-specific** — documented in the manual for that filesystem (`man xfs`, `man ext4`); only apply to one type
+- **Filesystem-independent** - documented in `man mount`; work on almost any filesystem (`ro`, `rw`, `noexec`, `nosuid`, `remount`, `async`, `atime`, etc.)
+- **Filesystem-specific** - documented in the manual for that filesystem (`man xfs`, `man ext4`); only apply to one type
 
 For XFS, `man xfs` lists options like `allocsize=N` which sets the buffered I/O end-of-file pre-allocation size:
 
@@ -481,7 +447,7 @@ Important caveat: `mount -o remount` is safe for filesystem-independent options 
 
 For ext4, use `man ext4` to see the equivalent options section.
 
-## 18. NFS export syntax: multi-host, wildcards, CIDR
+## 16. NFS export syntax: multi-host, wildcards, CIDR
 
 The `/etc/exports` format allows a single directory to be shared with multiple clients on the same line, each with different options:
 
@@ -506,14 +472,14 @@ There must be no space between the client field and the opening parenthesis. A s
 
 What the main export options mean:
 
-| Option | Meaning |
-|---|---|
-| `rw` | clients can read and write |
-| `ro` | clients can only read |
-| `sync` | NFS waits for data to reach storage before confirming the write |
-| `async` | NFS confirms writes immediately; faster but risks data loss on crash |
-| `no_subtree_check` | disables subtree checking; recommended default, avoids rename/move issues |
-| `no_root_squash` | root on the client keeps root privileges on the share; by default root is mapped to `nobody` |
+| Option             | Meaning                                                                                      |
+| ------------------ | -------------------------------------------------------------------------------------------- |
+| `rw`               | clients can read and write                                                                   |
+| `ro`               | clients can only read                                                                        |
+| `sync`             | NFS waits for data to reach storage before confirming the write                              |
+| `async`            | NFS confirms writes immediately; faster but risks data loss on crash                         |
+| `no_subtree_check` | disables subtree checking; recommended default, avoids rename/move issues                    |
+| `no_root_squash`   | root on the client keeps root privileges on the share; by default root is mapped to `nobody` |
 
 After editing `/etc/exports`, reload with `exportfs -r` and inspect the active shares:
 
@@ -525,7 +491,7 @@ $ sudo exportfs -v
 
 The verbose output shows defaults the NFS server adds even when not explicitly set. Full option reference: `man exports`.
 
-## 19. pidstat — finding which process is stressing storage
+## 17. pidstat - finding which process is stressing storage
 
 `iostat` shows which device is busy but not which process caused it. `pidstat` from the same `sysstat` package fills that gap. It shows I/O statistics broken down by process ID.
 
@@ -542,14 +508,14 @@ The `-d` flag selects disk I/O. The interval argument (`1`) updates every second
 
 Fields:
 
-- `kB_rd/s` — kilobytes read per second by this process
-- `kB_wr/s` — kilobytes written per second
-- `kB_ccwr/s` — kilobytes whose write was cancelled (written to page cache then truncated)
-- `iodelay` — I/O delay the process accumulated after it finished (in clock ticks)
+- `kB_rd/s` - kilobytes read per second by this process
+- `kB_wr/s` - kilobytes written per second
+- `kB_ccwr/s` - kilobytes whose write was cancelled (written to page cache then truncated)
+- `iodelay` - I/O delay the process accumulated after it finished (in clock ticks)
 
 Workflow: use `iostat` to spot which device has high `tps` or `kB_wrtn/s`, then use `pidstat -d` to identify which PID is responsible.
 
-## 20. Reading iostat output accurately
+## 18. Reading iostat output accurately
 
 Plain `iostat` reports **averages since boot**, not current activity. If writes stopped five minutes ago, the numbers still look significant because they are divided across the full uptime.
 
@@ -567,19 +533,273 @@ dm-0   197.23     517.01     600.42       0.00    256513    297900        0
 
 Column meanings:
 
-- `tps` — transfers per second (averaged since boot); high tps means the device receives many small requests
-- `kB_read/s`, `kB_wrtn/s` — throughput averaged since boot
-- `kB_read`, `kB_wrtn` — **running totals** since boot (not averages); these are exact
+- `tps` - transfers per second (averaged since boot); high tps means the device receives many small requests
+- `kB_read/s`, `kB_wrtn/s` - throughput averaged since boot
+- `kB_read`, `kB_wrtn` - **running totals** since boot (not averages); these are exact
 
 The CPU row adds `%iowait`: the percentage of time the CPU was idle while waiting for I/O to complete. Elevated `%iowait` alongside high device `tps` or throughput points to storage being the bottleneck.
 
 A storage device can be stressed in two distinct ways:
-1. Very frequent small operations — shows as high `tps`
-2. Large data volumes — shows as high `kB_read/s` or `kB_wrtn/s`
+
+1. Very frequent small operations - shows as high `tps`
+2. Large data volumes - shows as high `kB_read/s` or `kB_wrtn/s`
 
 Note: `iostat` numbers can be inflated for very small transfers because the device may report a full block updated even when the process only changed 1 KB.
 
-## 21. What to practice for LFCS
+## 19. Growing, shrinking and moving LVM storage
+
+Section 9 creates LVM objects. Exam tasks usually ask you to grow something without losing data.
+
+```bash
+$ sudo lvextend -r -L +500M vg1/data       # -r grows the filesystem in the same step
+$ sudo lvextend -r -l +100%FREE vg1/data   # use all free space in the VG
+$ sudo lvcreate -l 50%VG -n logs vg1       # size in extents or percentages
+$ lvs -o +devices                          # which PVs back each LV
+```
+
+Without `-r`, grow the filesystem yourself. ext4 is grown by device and XFS by mount point:
+
+```bash
+$ sudo resize2fs /dev/vg1/data             # ext4, works while mounted
+$ sudo xfs_growfs /srv/data                # XFS, must be mounted
+```
+
+XFS can't shrink. ext4 can, but only after unmounting:
+
+```bash
+$ sudo umount /srv/data
+$ sudo lvreduce -r -L 1G vg1/data          # runs fsck and resize2fs for you
+```
+
+Add disks to a VG and take them away again:
+
+```bash
+$ sudo vgextend vg1 /dev/vdd
+$ sudo pvmove /dev/vdb                     # move all extents off vdb
+$ sudo vgreduce vg1 /dev/vdb
+$ sudo pvremove /dev/vdb
+$ sudo pvresize /dev/vdc                   # after the underlying disk or partition grew
+```
+
+Rename and snapshot:
+
+```bash
+$ sudo vgrename vg1 vgdata ; sudo lvrename vgdata data appdata
+$ sudo lvcreate -s -L 200M -n data-snap vgdata/appdata
+$ sudo lvremove vgdata/data-snap
+```
+
+When an LV is renamed, update `/etc/fstab` too, unless the entry uses a UUID.
+
+## 20. Creating, managing and troubleshooting filesystems
+
+```bash
+$ sudo mkfs.ext4 -L appdata /dev/vdb1
+$ sudo mkfs.xfs -f -L logs /dev/vdc1       # -f overwrites an existing signature
+$ sudo e2label /dev/vdb1 newlabel ; sudo xfs_admin -L newlabel /dev/vdc1
+$ sudo wipefs -a /dev/vdd                  # remove all filesystem/LVM/RAID signatures
+$ sudo tune2fs -l /dev/vdb1 | less         # ext4 superblock details
+$ sudo tune2fs -m 1 /dev/vdb1              # reserved blocks to 1%
+$ xfs_info /srv/logs
+$ lsblk -f ; blkid
+```
+
+Mount by label in fstab: `LABEL=appdata /srv/app ext4 defaults 0 2`.
+
+Troubleshooting:
+
+- `mount: wrong fs type, bad option, bad superblock`: check the real type with `blkid`, then read the details in `dmesg | tail`.
+- `target is busy` on umount: find the users with `sudo lsof +f -- /srv/data` or `fuser -vm /srv/data`.
+- A read-only filesystem after I/O errors: check `dmesg`, unmount, run `fsck`/`xfs_repair` ([Operations section 21](./02-operations-deployment.md#21-recovering-from-boot-and-filesystem-failures)), then remount.
+- If the fstab `pass` field is `0`, the filesystem is never checked at boot. Use `1` for `/` and `2` for other ext4 filesystems. XFS ignores the field.
+
+## 21. Filesystem automounters
+
+An automounter mounts a filesystem on first access and unmounts it after it has been idle for a while. This suits NFS shares and home directories.
+
+### autofs
+
+```bash
+$ sudo apt install autofs nfs-common       # RHEL: dnf install autofs nfs-utils
+```
+
+Indirect map: the master file names a parent directory and a map file. Each key in the map becomes a subdirectory.
+
+```
+# /etc/auto.master  (or a file in /etc/auto.master.d/ ending in .autofs)
+/mnt/nfs   /etc/auto.nfs   --timeout=60
+
+# /etc/auto.nfs
+share    -rw,soft    node01:/srv/share
+backup   -ro         node01:/srv/backup
+```
+
+```bash
+$ sudo systemctl enable --now autofs
+$ sudo systemctl restart autofs            # after editing maps
+$ ls /mnt/nfs                              # empty: nothing is mounted yet
+$ ls /mnt/nfs/share                        # first access mounts it
+$ findmnt /mnt/nfs/share
+```
+
+Direct map: mounts at absolute paths.
+
+```
+# /etc/auto.master
+/-         /etc/auto.direct
+
+# /etc/auto.direct
+/data/share   -rw   node01:/srv/share
+```
+
+Wildcard map for home directories. `*` matches any key and `&` repeats the key:
+
+```
+# /etc/auto.master
+/home/remote   /etc/auto.home
+
+# /etc/auto.home
+*   -rw   node01:/home/&
+```
+
+Don't create the map subdirectories yourself. autofs creates and removes them on its own.
+
+### systemd automount
+
+The simplest option is an fstab entry:
+
+```
+node01:/srv/share  /mnt/share  nfs  noauto,x-systemd.automount,x-systemd.idle-timeout=60,_netdev  0 0
+```
+
+```bash
+$ sudo systemctl daemon-reload
+$ sudo systemctl restart remote-fs.target
+$ ls /mnt/share                            # triggers the mount
+```
+
+Or write the units by hand. The unit name must be the escaped mount path, so `/mnt/share` becomes `mnt-share` (`systemd-escape -p /mnt/share`):
+
+```ini
+# /etc/systemd/system/mnt-share.mount
+[Mount]
+What=node01:/srv/share
+Where=/mnt/share
+Type=nfs
+Options=rw,soft
+
+# /etc/systemd/system/mnt-share.automount
+[Automount]
+Where=/mnt/share
+TimeoutIdleSec=60
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+$ sudo systemctl daemon-reload
+$ sudo systemctl enable --now mnt-share.automount    # enable the .automount, not the .mount
+```
+
+## 22. The virtual filesystem: /proc, /sys, tmpfs, bind and loop mounts
+
+Linux shows many things as files even though they aren't stored on a disk. These virtual filesystems are listed with `findmnt -t proc,sysfs,tmpfs,devtmpfs`.
+
+- `/proc`: processes (`/proc/<PID>/`) and kernel state such as `/proc/meminfo`, `/proc/cpuinfo`, `/proc/mounts` and `/proc/cmdline`. `/proc/sys/` is what `sysctl` reads and writes: `cat /proc/sys/vm/swappiness` is the same as `sysctl vm.swappiness`.
+- `/sys`: devices, drivers and kernel objects, for example `/sys/block/sda/queue/scheduler` or `/sys/class/net/enp0s8/operstate`. Writing to it is a runtime change, gone at reboot.
+- `devtmpfs` on `/dev`: device nodes created by the kernel and udev.
+- `tmpfs`: a filesystem in RAM (it can swap), such as `/run` and `/dev/shm`.
+
+tmpfs:
+
+```bash
+$ sudo mount -t tmpfs -o size=256M,mode=1777 tmpfs /mnt/ram
+# persistent:
+tmpfs  /mnt/ram  tmpfs  size=256M,mode=1777  0 0
+```
+
+Bind mount, which makes a directory visible in a second place:
+
+```bash
+$ sudo mount --bind /srv/data /var/www/data
+$ sudo mount -o remount,bind,ro /var/www/data     # make the second view read-only
+# persistent:
+/srv/data  /var/www/data  none  bind  0 0
+```
+
+Loop device, which uses a file as a block device:
+
+```bash
+$ truncate -s 1G disk.img
+$ sudo losetup -fP --show disk.img                # prints /dev/loop0
+$ sudo mkfs.ext4 /dev/loop0 ; sudo mount /dev/loop0 /mnt/img
+$ losetup -a ; sudo losetup -d /dev/loop0         # list / detach
+$ sudo mount -o loop ubuntu.iso /mnt/iso          # shortcut for images
+```
+
+## 23. Network block devices: NBD and iSCSI
+
+Section 8 explains the idea. NFS shares files. A network block device shares a whole disk, and the client formats and mounts it as if it were local. Only one client may mount a normal filesystem on it at a time.
+
+### NBD
+
+Server:
+
+```bash
+$ sudo apt install nbd-server
+$ sudo truncate -s 1G /srv/nbd-disk1.img ; sudo chown nbd:nbd /srv/nbd-disk1.img
+```
+
+```ini
+# /etc/nbd-server/config
+[generic]
+    user = nbd
+    group = nbd
+    allowlist = true
+
+[disk1]
+    exportname = /srv/nbd-disk1.img
+```
+
+```bash
+$ sudo systemctl restart nbd-server        # listens on 10809/tcp
+```
+
+Client:
+
+```bash
+$ sudo apt install nbd-client
+$ sudo modprobe nbd ; echo nbd | sudo tee /etc/modules-load.d/nbd.conf
+$ sudo nbd-client -l node01                # list exports (needs allowlist = true)
+$ sudo nbd-client node01 -N disk1 /dev/nbd0
+$ sudo mkfs.ext4 /dev/nbd0 ; sudo mount /dev/nbd0 /mnt/nbd
+$ sudo umount /mnt/nbd ; sudo nbd-client -d /dev/nbd0   # disconnect
+```
+
+For persistence, add a line to `/etc/nbdtab` and mount it with `_netdev` in fstab. The unit that reads `/etc/nbdtab` at boot depends on the package version: an `nbd-client` init script, or the `nbd@.service` template (`systemctl enable nbd@nbd0`). Check with `systemctl list-unit-files 'nbd*'`.
+
+```
+# /etc/nbdtab
+nbd0  node01  disk1
+# /etc/fstab
+/dev/nbd0  /mnt/nbd  ext4  _netdev,nofail  0 0
+```
+
+### iSCSI (client side)
+
+```bash
+$ sudo apt install open-iscsi                     # RHEL: iscsi-initiator-utils
+$ sudo iscsiadm -m discovery -t sendtargets -p 192.168.56.11
+$ sudo iscsiadm -m node -T iqn.2026-01.lab:disk1 -p 192.168.56.11 --login
+$ lsblk                                           # new /dev/sdX appears
+$ sudo iscsiadm -m node -T iqn.2026-01.lab:disk1 --op update -n node.startup -v automatic
+$ sudo iscsiadm -m session ; sudo iscsiadm -m node -u   # list / log out
+```
+
+The client name is in `/etc/iscsi/initiatorname.iscsi`. Targets are usually created with `targetcli` on the server.
+
+## 24. What to practice for LFCS
 
 Prioritize these storage tasks:
 
@@ -595,7 +815,12 @@ Prioritize these storage tasks:
 - export and mount NFS shares with hostname, IP, CIDR, and wildcard client specs
 - understand all export options: `sync`/`async`, `no_subtree_check`, `no_root_squash`
 - understand NBD conceptually
-- create basic LVM and RAID layouts
-- manage ACLs and quotas
+- create, extend and resize LVM volumes
+- manage ACLs
 - spot device-level pressure with `iostat` (tps, throughput, `%iowait`)
 - identify the responsible process with `pidstat -d`
+- grow LVs together with their filesystem (`lvextend -r`); move data off a PV with `pvmove`
+- label, check and repair filesystems; resolve `target is busy`
+- configure autofs indirect, direct and wildcard maps, and systemd automounts
+- use tmpfs, bind mounts and loop devices; read `/proc` and `/sys`
+- export and attach an NBD device; log in to an iSCSI target

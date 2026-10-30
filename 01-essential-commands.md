@@ -1,6 +1,6 @@
 # Essential Commands
 
-This section covers the command-line skills that appear constantly in Linux administration: logging in, navigating the filesystem, managing files, reading help, searching text, handling permissions, working with archives, redirecting input/output, and basic certificate and Git usage.
+This section covers the command-line skills that appear constantly in Linux administration: logging in, navigating the filesystem, managing files, reading help, searching text, handling permissions, working with archives, redirecting input/output, certificates, Git, systemd services and their constraints, performance monitoring, and disk space troubleshooting.
 
 ## 1. Accessing local and remote Linux systems
 
@@ -469,6 +469,11 @@ Focus on speed and repetition with:
 - `tar` and compression tools
 - redirection and pipelines
 - reading help through `--help`, `man`, and `apropos`
+- finding what fills a disk (`df -h`, `df -i`, `du -xh`, `lsof +L1`) (section 28)
+- writing a systemd unit, fixing a failing one, and adding drop-ins (section 29)
+- reading and setting service limits (`systemctl set-property`, `/proc/<pid>/limits`) (section 30)
+- creating and inspecting certificates with `openssl` (section 32)
+- cloning, branching, committing and pushing with Git (section 33)
 
 If you can do these without stopping to think, the rest of the exam gets much easier.
 
@@ -476,17 +481,17 @@ If you can do these without stopping to think, the rest of the exam gets much ea
 
 Man pages are organised into numbered sections. The section number matters when the same name exists in multiple sections (for example, `passwd` the command versus `passwd` the file format).
 
-| Section | Content |
-|---------|---------|
-| 1 | User commands |
-| 2 | System calls |
-| 3 | Library functions |
-| 4 | Special files (devices) |
-| 5 | File formats and configuration files |
-| 6 | Games |
-| 7 | Miscellaneous (standards, protocols) |
-| 8 | System administration commands |
-| 9 | Kernel routines |
+| Section | Content                              |
+| ------- | ------------------------------------ |
+| 1       | User commands                        |
+| 2       | System calls                         |
+| 3       | Library functions                    |
+| 4       | Special files (devices)              |
+| 5       | File formats and configuration files |
+| 6       | Games                                |
+| 7       | Miscellaneous (standards, protocols) |
+| 8       | System administration commands       |
+| 9       | Kernel routines                      |
 
 To open a page from a specific section, pass the number before the name:
 
@@ -600,7 +605,7 @@ A user can own a file under any group they belong to. Group membership controls 
 Permission bits are stored as three triplets (user, group, others), each encoding read/write/execute. The binary representation maps directly to octal digits.
 
 | Symbol | Binary | Octal value |
-|--------|--------|-------------|
+| ------ | ------ | ----------- |
 | r      | 100    | 4           |
 | w      | 010    | 2           |
 | x      | 001    | 1           |
@@ -610,6 +615,7 @@ Permission bits are stored as three triplets (user, group, others), each encodin
 | ---    | 000    | 0           |
 
 So `chmod 754` means:
+
 - user: `7` = rwx
 - group: `5` = r-x
 - others: `4` = r--
@@ -633,10 +639,10 @@ $ ls -l report.txt
 
 `find` supports filtering by how recently a file's content or metadata changed.
 
-- `-mmin N` — modified within N minutes
-- `-mtime N` — modified within N days (day = 24 hours)
-- `-cmin N` — changed (metadata) within N minutes
-- `-ctime N` — changed within N days
+- `-mmin N` - modified within N minutes
+- `-mtime N` - modified within N days (day = 24 hours)
+- `-cmin N` - changed (metadata) within N minutes
+- `-ctime N` - changed within N days
 
 Prefix N with `-` for "less than" and `+` for "more than":
 
@@ -836,22 +842,22 @@ $ egrep -r '0+' /etc/
 
 When combined with `grep -E` or `egrep`, these operators build powerful patterns.
 
-| Operator | Meaning | Example |
-|----------|---------|---------|
-| `^`      | Line begins with | `^#` matches comment lines |
-| `$`      | Line ends with | `mail$` matches lines ending in "mail" |
-| `.`      | Any single character | `c.t` matches cat, cut, crt |
-| `*`      | Previous element 0 or more times | `let*` matches le, let, lettt |
-| `+`      | Previous element 1 or more times | `0+` matches 0, 00, 000 |
-| `?`      | Previous element 0 or 1 times (optional) | `colou?r` matches color, colour |
-| `{n,}`   | Previous element at least n times | `0{3,}` matches 000, 0000, … |
-| `{n,m}`  | Previous element n to m times | `0{2,4}` matches 00, 000, 0000 |
-| `\|`     | Alternation (BRE) / `\|` or `|` in ERE | `cat\|dog` matches cat or dog |
-| `[abc]`  | Character class | `[au]` matches a or u |
-| `[a-z]`  | Range | `[a-z]` matches any lowercase letter |
-| `[^abc]` | Negated class | `[^:]` matches anything except `:` |
-| `()`     | Grouping (ERE) | `(ab)+` matches ab, abab, … |
-| `\.`     | Escaped dot (literal `.`) | `192\.168` matches 192.168 exactly |
+| Operator | Meaning                                  | Example                                |
+| -------- | ---------------------------------------- | -------------------------------------- |
+| `^`      | Line begins with                         | `^#` matches comment lines             |
+| `$`      | Line ends with                           | `mail$` matches lines ending in "mail" |
+| `.`      | Any single character                     | `c.t` matches cat, cut, crt            |
+| `*`      | Previous element 0 or more times         | `let*` matches le, let, lettt          |
+| `+`      | Previous element 1 or more times         | `0+` matches 0, 00, 000                |
+| `?`      | Previous element 0 or 1 times (optional) | `colou?r` matches color, colour        |
+| `{n,}`   | Previous element at least n times        | `0{3,}` matches 000, 0000, …           |
+| `{n,m}`  | Previous element n to m times            | `0{2,4}` matches 00, 000, 0000         |
+| `\|`     | Alternation (BRE) / `\|` or `            | ` in ERE                               | `cat\|dog` matches cat or dog |
+| `[abc]`  | Character class                          | `[au]` matches a or u                  |
+| `[a-z]`  | Range                                    | `[a-z]` matches any lowercase letter   |
+| `[^abc]` | Negated class                            | `[^:]` matches anything except `:`     |
+| `()`     | Grouping (ERE)                           | `(ab)+` matches ab, abab, …            |
+| `\.`     | Escaped dot (literal `.`)                | `192\.168` matches 192.168 exactly     |
 
 Practical examples:
 
@@ -877,3 +883,258 @@ $ grep -r '/.*/' /etc/
 ```
 
 Always prefer `egrep` (or `grep -E`) over plain `grep` when your pattern uses `+`, `?`, `{`, `|`, or `()`, to avoid having to remember which characters need backslash escaping.
+
+## 28. Troubleshooting disk space
+
+A full disk shows up as `No space left on device`. There are three possible causes, so check them in this order: out of blocks, out of inodes, or space held by a deleted file that a process still has open.
+
+```bash
+# which filesystem is full (blocks)
+$ df -h
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda1        39G   39G     0 100% /
+
+# which filesystem is out of inodes (many tiny files)
+$ df -i
+
+# biggest directories, staying on one filesystem (-x)
+$ sudo du -xh --max-depth=1 / 2>/dev/null | sort -h | tail
+$ sudo du -xh --max-depth=1 /var | sort -h | tail
+
+# biggest files
+$ sudo find / -xdev -type f -size +100M -exec ls -lh {} \; 2>/dev/null
+```
+
+When `df` says the disk is full but `du` can't find the files, a process is holding a deleted file open:
+
+```bash
+$ sudo lsof +L1
+COMMAND  PID USER  FD  TYPE DEVICE  SIZE/OFF NLINK NODE NAME
+myapp   1234 root  3w  REG  8,1    5368709120   0 1311 /var/log/myapp.log (deleted)
+```
+
+You can free the space in two ways. Restart the process with `sudo systemctl restart myapp`. Or truncate the file through `/proc` without killing the process:
+
+```bash
+$ sudo truncate -s 0 /proc/1234/fd/3
+```
+
+Common places to clean up:
+
+```bash
+$ sudo journalctl --disk-usage
+$ sudo journalctl --vacuum-size=200M    # or --vacuum-time=7d
+$ sudo apt clean                         # cached .deb files
+$ sudo find /var/log -name '*.gz' -mtime +30 -delete
+```
+
+When inodes run out, look for the directory with the most entries:
+
+```bash
+$ sudo find / -xdev -type d -exec sh -c 'echo "$(ls -A "$1" | wc -l) $1"' _ {} \; 2>/dev/null | sort -n | tail
+```
+
+## 29. Creating and troubleshooting a systemd service
+
+The exam can ask you to turn a script into a service, or to fix a service that won't start.
+
+Minimal unit file at `/etc/systemd/system/myapp.service`:
+
+```ini
+[Unit]
+Description=My application
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=myapp
+ExecStart=/usr/local/bin/myapp.sh
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Activate it:
+
+```bash
+$ sudo systemctl daemon-reload          # after every unit file edit
+$ sudo systemctl enable --now myapp.service
+$ systemctl is-enabled myapp ; systemctl is-active myapp
+enabled
+active
+```
+
+Troubleshooting flow when a service fails:
+
+```bash
+$ systemctl status myapp                 # last log lines and exit code
+$ journalctl -u myapp -b --no-pager -n 50
+$ systemd-analyze verify /etc/systemd/system/myapp.service
+```
+
+Common causes:
+
+- `ExecStart` is not an absolute path
+- the script is not executable or has no shebang
+- the `User=` account doesn't exist
+- the port is already in use (`ss -tlnp | grep :8080`)
+- `daemon-reload` was forgotten after an edit
+- a unit is masked (`systemctl unmask myapp`)
+
+To change a packaged unit without editing it, use a drop-in. Vendor units in `/lib/systemd/system` get overwritten on upgrade, so edit the override instead:
+
+```bash
+$ sudo systemctl edit nginx              # writes /etc/systemd/system/nginx.service.d/override.conf
+$ systemctl cat nginx                    # shows the unit plus all drop-ins
+$ sudo systemctl revert nginx            # remove all overrides
+```
+
+To replace a list setting such as `ExecStart` in a drop-in, clear it first:
+
+```ini
+[Service]
+ExecStart=
+ExecStart=/usr/sbin/nginx -g 'daemon off;'
+```
+
+## 30. Service and application constraints
+
+"Determine application and service specific constraints" means finding what limits a service: resource limits, the user it runs as, ports, file permissions and security policy.
+
+Read the effective settings of a unit:
+
+```bash
+$ systemctl show myapp -p User -p MemoryMax -p CPUQuotaPerSecUSec -p TasksMax -p LimitNOFILE
+$ cat /proc/$(systemctl show -p MainPID --value myapp)/limits
+```
+
+Set cgroup limits on a unit. `set-property` is persistent by default and writes a drop-in for you:
+
+```bash
+$ sudo systemctl set-property myapp.service MemoryMax=512M CPUQuota=50%
+$ sudo systemctl set-property --runtime myapp.service CPUQuota=20%   # until reboot
+$ systemd-cgtop                                                      # live usage per unit
+```
+
+Or put them in a drop-in with `systemctl edit myapp`:
+
+```ini
+[Service]
+MemoryMax=512M
+CPUQuota=50%
+TasksMax=100
+LimitNOFILE=65536
+```
+
+Other constraints to check:
+
+- the port: `ss -tlnp` shows which process owns it
+- the account: `id myapp`, and whether it can read its files (`namei -l /path/to/file`)
+- security policy: AppArmor on Ubuntu (`aa-status`) or SELinux on RHEL-family systems (`ausearch -m avc -ts recent`)
+- per-user limits from `/etc/security/limits.conf`. These apply to PAM logins, not to systemd services; services use `Limit*=` in the unit.
+
+## 31. Monitoring system performance
+
+Quick triage, from broad to specific:
+
+```bash
+$ uptime                     # load averages 1/5/15 min; compare with nproc
+$ free -h                    # memory and swap; 'available' is what matters
+$ vmstat 2 5                 # r = runnable, si/so = swapping, wa = I/O wait
+$ top -o %MEM                # or press P (CPU) / M (memory) inside top
+$ ps aux --sort=-%cpu | head
+$ ps aux --sort=-%mem | head
+$ systemctl --failed         # failed units
+$ journalctl -p err -b       # errors since boot
+$ dmesg -T | tail            # kernel messages (OOM killer, disk errors)
+```
+
+An OOM kill looks like `Out of memory: Killed process 1234 (myapp)` in `dmesg` or `journalctl -k`.
+
+## 32. Working with SSL certificates
+
+Beyond creating a CSR (section 12), you should be able to make a self-signed certificate, inspect one, and check that a key matches its certificate.
+
+Self-signed certificate without a passphrase (`-noenc` replaces the older `-nodes`), valid for 365 days:
+
+```bash
+$ openssl req -x509 -newkey rsa:2048 -noenc -days 365 \
+    -keyout /etc/ssl/private/web.key -out /etc/ssl/certs/web.crt \
+    -subj "/C=US/O=Lab/CN=web.example.com"
+```
+
+Key and CSR without prompts:
+
+```bash
+$ openssl req -new -newkey rsa:2048 -noenc -keyout app.key -out app.csr -subj "/CN=app.example.com"
+$ openssl req -in app.csr -noout -text      # inspect a CSR
+```
+
+Inspect a certificate:
+
+```bash
+$ openssl x509 -in web.crt -noout -subject -issuer -dates
+$ openssl x509 -in web.crt -noout -text | less
+$ openssl x509 -in web.crt -noout -checkend 86400 && echo "valid for 1 more day"
+```
+
+Check that a key belongs to a certificate. The two digests must be identical:
+
+```bash
+$ openssl x509 -in web.crt -noout -pubkey | openssl sha256
+$ openssl pkey -in web.key -pubout | openssl sha256
+```
+
+Look at the certificate of a remote server:
+
+```bash
+$ openssl s_client -connect example.com:443 -servername example.com </dev/null 2>/dev/null \
+    | openssl x509 -noout -subject -dates
+```
+
+Sign a CSR with your own CA:
+
+```bash
+$ openssl x509 -req -in app.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out app.crt -days 90
+```
+
+Keep private keys at `chmod 600`, owned by root.
+
+## 33. More Git operations
+
+Beyond the basics in section 13:
+
+```bash
+$ git init project && cd project
+$ git config --global user.name "Lab User"
+$ git config --global user.email lab@example.com
+$ git status
+$ git diff                    # unstaged changes
+$ git diff --staged           # staged changes
+$ git switch -c feature       # create and switch (newer form of checkout -b)
+$ git log --oneline --graph --all
+$ git restore file.txt        # drop unstaged changes to file.txt
+$ git rm old.txt ; git mv a.txt b.txt
+```
+
+Remotes:
+
+```bash
+$ git clone https://example.com/repo.git
+$ git clone /srv/git/repo.git            # a local bare repo works too
+$ git remote -v
+$ git remote add origin /srv/git/repo.git
+$ git push -u origin main
+$ git pull
+```
+
+Create a bare repository that others push to:
+
+```bash
+$ sudo git init --bare /srv/git/repo.git
+```
+
+Tag a release with `git tag v1.0` and push it with `git push origin v1.0`.
