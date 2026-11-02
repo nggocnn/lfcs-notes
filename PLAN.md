@@ -1,5 +1,7 @@
 # LFCS study plan
 
+**Paused on 2026-11-02. Planned restart: after 2026-12-01.**
+
 Six weeks at about 7 hours a week: revision, recall quizzes, hands-on labs, then timed mock exams. Exam facts were checked against the Linux Foundation pages on 2026-10-30.
 
 ## The exam
