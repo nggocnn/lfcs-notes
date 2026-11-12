@@ -4,6 +4,8 @@
 
 Six weeks at about 7 hours a week: revision, recall quizzes, hands-on labs, then timed mock exams. Exam facts were checked against the Linux Foundation pages on 2026-10-30.
 
+Visual overview: [study map](https://nggocnn.github.io/lfcs-notes/#/map), built from this file.
+
 ## The exam
 
 | Item         | Value                                                                                                                 |
@@ -85,6 +87,8 @@ Each week has about 5 sessions of 80-90 minutes. Every session starts with 10 mi
 ## How to run the practice
 
 **Quizzes**: answer out loud or on paper before opening the answer. A question counts as known only when you can type the command without looking. Log misses below and repeat them two days later.
+
+**Away from the laptop**: use the [phone study app](./README.md#study-on-your-phone) for quiz recall, notes and lab/mock rehearsal. Copy its Misses rows into the table below.
 
 **Labs**: restore the snapshot, work only from `man` and `--help`, and stay within the target time. Afterwards, reboot the node and verify again, because persistence is where most points are lost.
 

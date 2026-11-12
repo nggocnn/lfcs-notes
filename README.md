@@ -2,7 +2,7 @@
 
 Notes and practice material for the Linux Foundation Certified System Administrator (LFCS) exam. The material follows the current curriculum: five domains, 2 hours, 17-20 hands-on tasks, 67% to pass.
 
-Start with the [study plan](./PLAN.md). It has the 6-week schedule, a log for mistakes, and a table that maps every curriculum competency to notes, quizzes, labs and mock tasks.
+Start with the [study plan](./PLAN.md). For a one-page visual overview of the plan, lab and coverage, open the [study map](https://nggocnn.github.io/lfcs-notes/#/map). The plan has the 6-week schedule, a log for mistakes, and a table that maps every curriculum competency to notes, quizzes, labs and mock tasks.
 
 ## Notes
 
@@ -26,3 +26,11 @@ vagrant ssh base
 bash /lfcs/mock/setup-mock-1.sh     # then solve mock/mock-1.md in 2 hours
 bash /lfcs/mock/check-mock-1.sh     # score per task
 ```
+
+## Study on your phone
+
+<https://nggocnn.github.io/lfcs-notes/> is an offline web app built from this repo on every push to `main`: quiz flashcards with spaced repetition, the notes with a section index, a study map (exam facts, schedule, lab topology, curriculum coverage with a "practise these cards" button per competency), lab and mock tasks as "how would you solve it" cards, search, and a Misses list that copies rows for the table in [PLAN.md](./PLAN.md#misses).
+
+Open it once online, then add it to the home screen (iPhone: Safari → Share → Add to Home Screen; Android: Chrome → ⋮ → Install app). After that it works without a connection. Progress stays on the device; use Misses → Export to back it up.
+
+Build it locally with `pip install markdown && python3 tools/build_site.py`, then `python3 -m http.server -d _site`.
