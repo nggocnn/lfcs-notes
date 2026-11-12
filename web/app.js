@@ -188,6 +188,7 @@ function viewHome() {
     `<button class="seg ${p.textSize === k ? "on" : ""}" data-size="${k}">${l}</button>`).join("");
 
   $app.innerHTML = `
+    <div class="hleft">
     <section class="hero">
       <div class="hstats">
         <div><b>${done}</b><span>today</span></div>
@@ -204,10 +205,14 @@ function viewHome() {
         <button data-start="browse">🔀 Shuffle</button>
       </div>
     </section>
+    </div>
 
+    <div class="hright">
     <h3 class="sect">By domain <span class="muted small">tap to study one</span></h3>
     <div class="tiles">${tiles}</div>
+    </div>
 
+    <div class="hleft hleft2">
     ${store.lastNote ? `<a class="card resume" href="#/notes/${store.lastNote}">📖 Continue reading <span class="muted">${esc(lastNoteTitle())}</span></a>` : ""}
 
     <details class="card settings">
@@ -218,7 +223,8 @@ function viewHome() {
       <div class="set"><span>Text size</span><div class="segs">${sizeBtns}</div></div>
       <label class="set"><span>Wrap long commands</span><input type="checkbox" id="wrap" ${p.wrapCode ? "checked" : ""}></label>
       <p class="muted small">Quiz = recall. Labs and Mocks = say how you'd solve the task, then check. Progress stays on this phone; back it up from Misses.</p>
-    </details>`;
+    </details>
+    </div>`;
 
   $app.querySelectorAll("[data-start]").forEach((b) => b.onclick = () => startSession(b.dataset.start));
   $app.querySelector("[data-quick]").onclick = () => startSession("due", { limit: 10 });
