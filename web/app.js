@@ -654,6 +654,7 @@ function render() {
   const parts = location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent);
   const tab = { "": "study", study: "study", card: "study", notes: "notes", map: "map", search: "search", misses: "misses" }[parts[0]] || "study";
   document.querySelectorAll("#tabs a").forEach((a) => a.classList.toggle("on", a.dataset.tab === tab));
+  $app.dataset.view = parts[0] && parts[0] !== "notes" ? parts[0] : parts[0] === "notes" ? (parts[1] ? "note" : "notes") : "home";
   const mb = document.getElementById("missbadge"), mc = Object.values(store.misses).filter((m) => !m.done).length;
   if (mb) { mb.hidden = !mc; mb.textContent = mc; }
   if (parts[0] !== "notes") currentNoteKey = null;
