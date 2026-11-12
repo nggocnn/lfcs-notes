@@ -14,16 +14,14 @@
 <link rel="stylesheet" href="style.css?v=__BUILD__">
 </head>
 <body>
-<header id="top">
-  <a href="#/" class="brand">LFCS</a>
-  <nav>
-    <a href="#/" data-tab="study">Study</a>
-    <a href="#/notes" data-tab="notes">Notes</a>
-    <a href="#/map" data-tab="map">Map</a>
-    <a href="#/search" data-tab="search">Search</a>
-    <a href="#/misses" data-tab="misses">Misses</a>
-  </nav>
-</header>
+
+<nav id="tabs" aria-label="Sections">
+  <a href="#/" data-tab="study"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4z M8 9h8 M8 13h5"/></svg><span>Study</span></a>
+  <a href="#/notes" data-tab="notes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11l3 3v13H5z M9 9h7 M9 13h7 M9 17h4"/></svg><span>Notes</span></a>
+  <a href="#/map" data-tab="map"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z M9 4v14 M15 6v14"/></svg><span>Map</span></a>
+  <a href="#/search" data-tab="search"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4a7 7 0 1 0 0 14a7 7 0 0 0 0-14z M16 16l4 4"/></svg><span>Search</span></a>
+  <a href="#/misses" data-tab="misses"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 2 20h20z M12 10v4 M12 17v.5"/></svg><span>Misses</span><i id="missbadge" hidden></i></a>
+</nav>
 <main id="app"><p class="muted">Loading…</p></main>
 <script>window.BUILD = "__BUILD__";</script>
 <script src="app.js?v=__BUILD__"></script>
